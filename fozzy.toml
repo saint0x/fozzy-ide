@@ -1,0 +1,6 @@
+[project]
+name = "fozzy-tauri"
+scenario_root = "tests/generated"
+
+[artifacts]
+dir = "artifacts"

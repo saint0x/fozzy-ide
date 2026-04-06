@@ -1,0 +1,43 @@
+import type { Workspace } from '@/types';
+
+export const mockWorkspaces: Workspace[] = [
+  {
+    id: 'ws-001',
+    name: 'photon-engine',
+    path: '/Users/deepsaint/projects/photon-engine',
+    parentPath: '/Users/deepsaint/projects',
+    lastOpened: '2026-04-06T09:32:00Z',
+    starred: true,
+    status: 'healthy',
+    testCount: 147,
+    passingCount: 142,
+    failingCount: 3,
+    coveragePercent: 87.4,
+  },
+  {
+    id: 'ws-002',
+    name: 'dataflow-runtime',
+    path: '/Users/deepsaint/projects/dataflow-runtime',
+    parentPath: '/Users/deepsaint/projects',
+    lastOpened: '2026-04-05T17:15:00Z',
+    starred: false,
+    status: 'warning',
+    testCount: 89,
+    passingCount: 79,
+    failingCount: 8,
+    coveragePercent: 62.1,
+  },
+  {
+    id: 'ws-003',
+    name: 'quark-scheduler',
+    path: '/Users/deepsaint/work/quark-scheduler',
+    parentPath: '/Users/deepsaint/work',
+    lastOpened: '2026-04-04T11:08:00Z',
+    starred: true,
+    status: 'error',
+    testCount: 53,
+    passingCount: 31,
+    failingCount: 19,
+    coveragePercent: 41.7,
+  },
+];

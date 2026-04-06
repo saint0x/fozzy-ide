@@ -1,0 +1,35 @@
+[package]
+name = "fozzy-platform"
+version = "0.1.0"
+description = "Native backend platform for the Fozzy Tauri app"
+authors = ["Codex"]
+license = ""
+repository = ""
+edition = "2024"
+rust-version = "1.85.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "fozzy_platform"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.5.6" }
+
+[dependencies]
+chrono = { version = "0.4.44", features = ["serde"] }
+git2 = "0.20.4"
+parking_lot = "0.12.5"
+rusqlite = { version = "0.39.0", features = ["bundled", "chrono", "serde_json"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+sha2 = "0.10.9"
+tauri = { version = "2.10.3" }
+thiserror = "2.0.18"
+tokio = { version = "1.51.0", features = ["full"] }
+uuid = { version = "1.23.0", features = ["serde", "v4"] }
+walkdir = "2.5.0"
+
+[dev-dependencies]
+tempfile = "3.23.0"

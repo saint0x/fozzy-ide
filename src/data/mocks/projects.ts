@@ -1,0 +1,48 @@
+import type { Project } from '@/types';
+
+export const mockProjects: Project[] = [
+  {
+    id: 'proj-001',
+    workspaceId: 'ws-001',
+    name: 'photon-core',
+    path: '/Users/deepsaint/projects/photon-engine/core',
+    language: 'rust',
+    scanState: 'complete',
+    configStatus: 'configured',
+    scenarioCount: 98,
+    lastScanned: '2026-04-06T09:30:00Z',
+  },
+  {
+    id: 'proj-002',
+    workspaceId: 'ws-001',
+    name: 'photon-ui',
+    path: '/Users/deepsaint/projects/photon-engine/ui',
+    language: 'typescript',
+    scanState: 'complete',
+    configStatus: 'configured',
+    scenarioCount: 49,
+    lastScanned: '2026-04-06T09:31:00Z',
+  },
+  {
+    id: 'proj-003',
+    workspaceId: 'ws-002',
+    name: 'dataflow-runtime',
+    path: '/Users/deepsaint/projects/dataflow-runtime',
+    language: 'rust',
+    scanState: 'scanning',
+    configStatus: 'configured',
+    scenarioCount: 89,
+    lastScanned: '2026-04-05T17:10:00Z',
+  },
+  {
+    id: 'proj-004',
+    workspaceId: 'ws-003',
+    name: 'quark-scheduler',
+    path: '/Users/deepsaint/work/quark-scheduler',
+    language: 'go',
+    scanState: 'error',
+    configStatus: 'invalid',
+    scenarioCount: 53,
+    lastScanned: null,
+  },
+];
