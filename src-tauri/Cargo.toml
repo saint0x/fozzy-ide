@@ -15,7 +15,7 @@ name = "fozzy_platform"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.5.6" }
+tauri-build = { version = "2.5.6", features = [] }
 
 [dependencies]
 chrono = { version = "0.4.44", features = ["serde"] }
@@ -25,7 +25,7 @@ rusqlite = { version = "0.39.0", features = ["bundled", "chrono", "serde_json"] 
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 sha2 = "0.10.9"
-tauri = { version = "2.10.3" }
+tauri = { version = "2.10.3", features = [] }
 thiserror = "2.0.18"
 tokio = { version = "1.51.0", features = ["full"] }
 uuid = { version = "1.23.0", features = ["serde", "v4"] }
