@@ -132,6 +132,7 @@ export interface FileNode {
   type: 'file' | 'directory';
   children?: FileNode[];
   language?: string;
+  truncated?: boolean;
 }
 
 export interface EditorTab {
@@ -173,6 +174,7 @@ export interface Settings {
   telemetryEnabled: boolean;
   checkpointInterval: number;
   defaultRunner: string;
+  lastWorkspaceId?: string | null;
 }
 
 export * from './backend-contracts';

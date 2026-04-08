@@ -3,6 +3,7 @@ import { SidebarNav } from './sidebar-nav';
 import { Topbar } from './topbar';
 import { BottomDrawer } from './bottom-drawer';
 import { CommandPalette } from './command-palette';
+import { NoticeCenter } from './notice-center';
 
 export function AppShell() {
   return (
@@ -25,6 +26,7 @@ export function AppShell() {
 
       {/* Command palette overlay */}
       <CommandPalette />
+      <NoticeCenter />
     </div>
   );
 }

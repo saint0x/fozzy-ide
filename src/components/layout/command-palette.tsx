@@ -13,8 +13,8 @@ import {
   Settings,
   Terminal,
   PanelLeftClose,
-  FileText,
 } from 'lucide-react';
+import { appDataProvider } from '@/data/provider';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/stores/app-store';
 
@@ -33,6 +33,7 @@ export function CommandPalette() {
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const setDrawerTab = useAppStore((s) => s.setDrawerTab);
   const setActiveSection = useAppStore((s) => s.setActiveSection);
+  const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId);
   const navigate = useNavigate();
 
   const [query, setQuery] = useState('');
@@ -68,9 +69,11 @@ export function CommandPalette() {
         label: 'Run all tests',
         group: 'Actions',
         icon: Play,
-        action: () => {
+        action: async () => {
           navigate('/runs');
           setActiveSection('runs');
+          if (!activeWorkspaceId) return;
+          await appDataProvider.workflows.execute('strict', false);
         },
         keywords: 'run execute test all',
       },
@@ -90,28 +93,8 @@ export function CommandPalette() {
         action: toggleSidebar,
         keywords: 'sidebar collapse expand panel',
       },
-      {
-        id: 'recent-utils',
-        label: 'src/lib/utils.ts',
-        group: 'Recent Files',
-        icon: FileText,
-        action: () => {
-          navigate('/editor');
-          setActiveSection('editor');
-        },
-      },
-      {
-        id: 'recent-app-store',
-        label: 'src/stores/app-store.ts',
-        group: 'Recent Files',
-        icon: FileText,
-        action: () => {
-          navigate('/editor');
-          setActiveSection('editor');
-        },
-      },
     ];
-  }, [navigate, setActiveSection, setDrawerTab, toggleSidebar]);
+  }, [activeWorkspaceId, navigate, setActiveSection, setDrawerTab, toggleSidebar]);
 
   const filtered = useMemo(() => {
     if (!query.trim()) return commands;

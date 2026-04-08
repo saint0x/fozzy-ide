@@ -4,11 +4,21 @@ Fozzy IDE is a desktop workbench for [Fozzy](https://github.com/ariacomputecompa
 
 This project pairs a React + Tauri desktop shell with a native Rust backend that treats Fozzy as a durable local platform, not just a thin command wrapper. The goal is to make multi-project Fozzy workflows fast, safe, inspectable, and useful for real day-to-day scenario authoring and verification.
 
+## Local-First Contract
+
+Fozzy IDE is designed as a fully local desktop application.
+
+- Workspace import, scanning, indexing, trace inspection, artifact access, and generation all operate against local files on disk.
+- The backend reads project-local `fozzy.toml`, scenario files, `.fozzy` runtime state, recorded traces, corpora, and generated artifacts directly from the machine running the app.
+- Fozzy execution is performed through the locally installed Fozzy toolchain under the hood, so `run`, `test`, `explore`, `replay`, `trace verify`, `ci`, and related flows stay end-to-end local.
+- No cloud execution layer is required for the core product path.
+
 ## What It Does
 
 - Imports and persists trusted workspaces with scan results, repo metadata, readiness gaps, and session state.
 - Scans Fozzy projects for `fozzy.toml`, scenarios, traces, corpora, artifacts, and hidden `.fozzy` state.
 - Exposes typed backend commands for the core Fozzy surface, including `run`, `test`, `fuzz`, `explore`, `replay`, `trace verify`, `ci`, `map`, `doctor`, `env`, `schema`, and `validate`.
+- Uses the local Fozzy executable as the execution engine behind those typed backend requests.
 - Streams run lifecycle events through the Tauri backend and stores run history in SQLite.
 - Provides safe backend-only filesystem writes with path confinement, atomic writes, and compare-and-swap style overwrite protection.
 - Offers a first-pass Fozzy document API and LSP-oriented contract for diagnostics, hover, completions, symbols, code actions, and semantic-token style responses.

@@ -1,8 +1,7 @@
 import { Search, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/stores/app-store';
-import { useActiveRuns } from '@/hooks/use-data';
-import { useWorkspace } from '@/hooks/use-data';
+import { useActiveRuns, useActiveWorkspace } from '@/hooks/use-data';
 
 const sectionLabels: Record<string, string> = {
   overview: 'Overview',
@@ -19,9 +18,8 @@ const sectionLabels: Record<string, string> = {
 export function Topbar() {
   const activeSection = useAppStore((s) => s.activeSection);
   const setCommandPaletteOpen = useAppStore((s) => s.setCommandPaletteOpen);
-  const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId);
   const { data: activeRuns } = useActiveRuns();
-  const { data: workspace } = useWorkspace(activeWorkspaceId);
+  const workspace = useActiveWorkspace();
 
   const hasActiveRuns = activeRuns && activeRuns.length > 0;
 

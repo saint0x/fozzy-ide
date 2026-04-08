@@ -32,6 +32,21 @@ export interface WorkspaceSummary {
   name: string;
   rootPath: string;
   parentPath: string;
+  importedAt: string;
+  lastOpenedAt: string;
+  scenarioCount: number;
+  traceCount: number;
+  artifactCount: number;
+  configPath: string | null;
+  readinessGaps: ReadinessGap[];
+  session: WorkspaceSessionState;
+}
+
+export interface WorkspaceDetail {
+  id: string;
+  name: string;
+  rootPath: string;
+  parentPath: string;
   trusted: boolean;
   repo: RepoMetadata;
   importedAt: string;
@@ -39,9 +54,44 @@ export interface WorkspaceSummary {
   scenarioCount: number;
   traceCount: number;
   artifactCount: number;
+  configPath: string | null;
   readinessGaps: ReadinessGap[];
-  scanSummary: ScanSummary;
   session: WorkspaceSessionState;
+}
+
+export interface WorkspaceProjectSummary {
+  id: string;
+  workspaceId: string;
+  name: string;
+  rootPath: string;
+  parentPath: string;
+  importedAt: string;
+  lastOpenedAt: string;
+  scenarioCount: number;
+  traceCount: number;
+  artifactCount: number;
+  configPath: string | null;
+  readinessGaps: ReadinessGap[];
+  repo: RepoMetadata;
+}
+
+export interface SettingsResponse {
+  theme: 'dark' | 'light' | 'system';
+  fontSize: number;
+  tabSize: number;
+  autoSave: boolean;
+  telemetryEnabled: boolean;
+  checkpointInterval: number;
+  defaultRunner: string;
+  lastWorkspaceId: string | null;
+}
+
+export interface AppBootstrap {
+  storageRoot: string;
+  dbPath: string;
+  settings: SettingsResponse;
+  workspaces: WorkspaceSummary[];
+  activeWorkspaceId: string | null;
 }
 
 export interface ScenarioSummary {
@@ -69,6 +119,22 @@ export interface RunSummary {
   finishedAt: string | null;
   tracePath: string | null;
   stdoutJson: unknown;
+  stdoutText: string;
+  stderrText: string;
+}
+
+export interface RunListItem {
+  id: string;
+  workspaceId: string;
+  command: string;
+  args: string[];
+  status: string;
+  exitCode: number | null;
+  startedAt: string;
+  finishedAt: string | null;
+  tracePath: string | null;
+  stdoutPreview: string;
+  stderrPreview: string;
 }
 
 export interface RunEventEnvelope {
@@ -92,6 +158,85 @@ export interface TelemetrySeries {
   workspaceId: string;
   metric: string;
   points: TelemetryPoint[];
+}
+
+export interface TelemetrySample {
+  id: string;
+  workspaceId: string;
+  runId: string | null;
+  metric: string;
+  capturedAt: string;
+  value: number;
+  label: string | null;
+  tags: Record<string, unknown>;
+}
+
+export interface TelemetryRollup {
+  id: string;
+  workspaceId: string;
+  metric: string;
+  bucket: string;
+  bucketStart: string;
+  count: number;
+  min: number;
+  max: number;
+  avg: number;
+  sum: number;
+  last: number;
+}
+
+export interface TelemetrySnapshotResponse {
+  workspaceId: string;
+  recordedAt: string;
+  passRate: number;
+  failRate: number;
+  totalRuns: number;
+  avgLatencyMs: number;
+  flakeSignals: number;
+  memoryUsageMb: number;
+  exploreProgress: number;
+  fuzzProgress: number;
+  throughputPerHour: number;
+  traceRecordRate: number;
+  artifactCount: number;
+}
+
+export interface TrendPoint {
+  ts: string;
+  value: number;
+  count: number;
+}
+
+export interface TrendSeriesResponse {
+  key: string;
+  label: string;
+  points: TrendPoint[];
+}
+
+export interface ScenarioTrend {
+  scenarioPath: string;
+  totalRuns: number;
+  successRate: number;
+  avgLatencyMs: number;
+  lastStatus: string;
+  lastRunAt: string;
+}
+
+export interface CommandTrend {
+  command: string;
+  totalRuns: number;
+  successRate: number;
+  avgLatencyMs: number;
+}
+
+export interface TrendReport {
+  workspaceId: string;
+  range: string;
+  generatedAt: string;
+  snapshot: TelemetrySnapshotResponse;
+  series: TrendSeriesResponse[];
+  topScenarios: ScenarioTrend[];
+  commandBreakdown: CommandTrend[];
 }
 
 export interface DocumentApiResponse {
@@ -197,4 +342,14 @@ export interface TerminalSession {
   status: string;
   startedAt: string;
   lastOutput: string;
+}
+
+export interface WorkspaceWorkflowResult {
+  workspaceId: string;
+  workflowId: string;
+  mode: string;
+  generatedPaths: string[];
+  runIds: string[];
+  tracePaths: string[];
+  scenarioCount: number;
 }

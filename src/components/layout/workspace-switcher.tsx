@@ -1,14 +1,71 @@
-import { Star, Plus, ChevronDown } from 'lucide-react';
+import { Plus, ChevronDown } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
+import { selectProjectFolder } from '@/lib/project-import';
 import { useAppStore } from '@/stores/app-store';
-import { useWorkspaces, useWorkspace } from '@/hooks/use-data';
+import { useActiveWorkspace, useImportWorkspace, useWorkspaces } from '@/hooks/use-data';
+import { appDataProvider } from '@/data/provider';
 import { Dropdown, DropdownItem, DropdownSeparator, StatusDot } from '@/components/ui';
+import type { Workspace } from '@/types';
+
+const MAX_VISIBLE_WORKSPACES = 5;
 
 export function WorkspaceSwitcher() {
+  const queryClient = useQueryClient();
   const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId);
   const setActiveWorkspaceId = useAppStore((s) => s.setActiveWorkspaceId);
+  const pushNotice = useAppStore((s) => s.pushNotice);
   const { data: workspaces } = useWorkspaces();
-  const { data: currentWorkspace } = useWorkspace(activeWorkspaceId);
+  const currentWorkspace = useActiveWorkspace();
+  const importWorkspace = useImportWorkspace();
+  const orderedWorkspaces = [...(workspaces ?? [])].sort((left, right) =>
+    right.lastOpened.localeCompare(left.lastOpened),
+  );
+
+  async function handleImportWorkspace() {
+    const path = await selectProjectFolder();
+    if (!path) return;
+    importWorkspace.mutate(path);
+  }
+
+  async function handleSelectWorkspace(workspaceId: string) {
+    if (workspaceId === activeWorkspaceId) return;
+    setActiveWorkspaceId(workspaceId);
+    const workspace = orderedWorkspaces.find((item) => item.id === workspaceId);
+    if (workspace) {
+      queryClient.setQueryData<Workspace[]>(['workspaces'], (current = []) => [
+        workspace,
+        ...current.filter((item) => item.id !== workspace.id),
+      ]);
+      queryClient.setQueryData(['workspace', workspace.id], {
+        ...workspace,
+        lastOpened: new Date().toISOString(),
+      });
+    }
+    pushNotice({
+      tone: 'success',
+      title: workspace ? `Workspace active: ${workspace.name}` : 'Workspace switched',
+      message: 'Shell state is refreshing for the selected workspace.',
+    });
+    void appDataProvider.bootstrap.setActiveWorkspace(workspaceId).catch((error) => {
+      console.error('[fozzy] failed to persist workspace switch', error);
+    });
+    void Promise.allSettled([
+      queryClient.invalidateQueries({ queryKey: ['projects', workspaceId] }),
+      queryClient.invalidateQueries({ queryKey: ['scenarios', workspaceId] }),
+      queryClient.invalidateQueries({ queryKey: ['runs', workspaceId] }),
+      queryClient.invalidateQueries({ queryKey: ['activity', workspaceId] }),
+      queryClient.invalidateQueries({ queryKey: ['telemetry', workspaceId] }),
+      queryClient.prefetchQuery({
+        queryKey: ['workspace', workspaceId],
+        queryFn: () => appDataProvider.workspaces.get(workspaceId),
+      }),
+      queryClient.prefetchQuery({
+        queryKey: ['fileTree', workspace?.path ?? workspaceId],
+        queryFn: () => appDataProvider.fileSystem.getTree(workspace?.path ?? ''),
+      }),
+    ]);
+  }
 
   const trigger = (
     <div
@@ -46,47 +103,36 @@ export function WorkspaceSwitcher() {
         </div>
       </div>
 
-      {workspaces?.map((ws) => (
-        <DropdownItem
-          key={ws.id}
-          onClick={() => setActiveWorkspaceId(ws.id)}
-        >
-          <div className="flex items-center gap-2 w-full min-w-0">
-            <StatusDot status={ws.status} />
-            <div className="flex-1 min-w-0">
-              <div
-                className={cn(
-                  'text-xs truncate',
-                  ws.id === activeWorkspaceId ? 'text-text-primary font-medium' : 'text-text-secondary',
-                )}
-              >
-                {ws.name}
+      <div className="max-h-[240px] overflow-y-auto">
+        {orderedWorkspaces.map((ws, index) => (
+          <DropdownItem
+            key={ws.id}
+            onClick={() => void handleSelectWorkspace(ws.id)}
+            className={cn(index >= MAX_VISIBLE_WORKSPACES && 'opacity-95')}
+          >
+            <div className="flex items-center gap-2 w-full min-w-0">
+              <StatusDot status={ws.status} />
+              <div className="flex-1 min-w-0">
+                <div
+                  className={cn(
+                    'text-xs truncate',
+                    ws.id === activeWorkspaceId ? 'text-text-primary font-medium' : 'text-text-secondary',
+                  )}
+                >
+                  {ws.name}
+                </div>
+                <div className="text-[10px] text-text-muted truncate">{ws.parentPath}</div>
               </div>
-              <div className="text-[10px] text-text-muted truncate">{ws.parentPath}</div>
             </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                // toggle star - would call mutation
-              }}
-              className="p-0.5 text-text-muted hover:text-warning transition-colors"
-            >
-              <Star
-                className={cn(
-                  'h-3 w-3',
-                  ws.starred && 'fill-warning text-warning',
-                )}
-              />
-            </button>
-          </div>
-        </DropdownItem>
-      ))}
+          </DropdownItem>
+        ))}
+      </div>
 
       <DropdownSeparator />
 
-      <DropdownItem>
+      <DropdownItem onClick={() => void handleImportWorkspace()}>
         <Plus className="h-3 w-3" />
-        <span>Import workspace</span>
+        <span>Add workspace</span>
       </DropdownItem>
     </Dropdown>
   );

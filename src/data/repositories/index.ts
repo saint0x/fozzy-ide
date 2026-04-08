@@ -10,6 +10,7 @@ import type {
   FileNode,
   Diagnostic,
   ActivityItem,
+  LspDocumentBundle,
   Settings,
 } from '@/types';
 
@@ -18,11 +19,13 @@ export interface WorkspaceRepository {
   get(id: string): Promise<Workspace>;
   getRecent(): Promise<Workspace[]>;
   import(path: string): Promise<Workspace>;
+  mapSuites(id: string): Promise<Run>;
 }
 
 export interface ProjectRepository {
   list(workspaceId: string): Promise<Project[]>;
   get(id: string): Promise<Project>;
+  import(workspaceId: string, path: string): Promise<Project>;
   scan(id: string): Promise<void>;
   initialize(id: string): Promise<void>;
 }
@@ -37,6 +40,7 @@ export interface ScenarioRepository {
 export interface RunRepository {
   list(filters?: { scenarioId?: string; state?: string; limit?: number }): Promise<Run[]>;
   get(id: string): Promise<Run>;
+  events(): Promise<import('@/types').RunEventEnvelope[]>;
   cancel(id: string): Promise<void>;
   getActive(): Promise<Run[]>;
 }
@@ -63,6 +67,7 @@ export interface ArtifactRepository {
 export interface FileSystemRepository {
   getTree(rootPath: string): Promise<FileNode>;
   readFile(path: string): Promise<string>;
+  getDocumentBundle(path: string): Promise<LspDocumentBundle>;
   writeFile(path: string, content: string): Promise<void>;
   getDiagnostics(): Promise<Diagnostic[]>;
 }

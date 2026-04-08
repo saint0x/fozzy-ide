@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useArtifacts } from '@/hooks/use-data';
+import { appDataProvider } from '@/data/provider';
 import { useAppStore } from '@/stores/app-store';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -140,7 +141,12 @@ export default function ArtifactsPage() {
                 </div>
 
                 <div className="flex items-center gap-2 pt-1">
-                  <Button variant="outline" size="sm" className="flex-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => void appDataProvider.artifacts.download(art.id)}
+                  >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                       <polyline points="7 10 12 15 17 10" />
@@ -149,7 +155,16 @@ export default function ArtifactsPage() {
                     Download
                   </Button>
                   {isPreviewable(art.type) && (
-                    <Button variant="ghost" size="sm">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={async () => {
+                        const artifact = await appDataProvider.artifacts.get(art.id);
+                        const content = await appDataProvider.fileSystem.readFile(artifact.path);
+                        const preview = window.open('', '_blank', 'noopener,noreferrer');
+                        preview?.document.write(`<pre>${content.replaceAll('<', '&lt;')}</pre>`);
+                      }}
+                    >
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
                         <circle cx="12" cy="12" r="3" />

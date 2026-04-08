@@ -1,11 +1,17 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/stores/app-store';
 import {
-  useWorkspace,
+  useActiveWorkspace,
+  useImportWorkspace,
+  useMapSuites,
+  useProjects,
   useScenarios,
   useActiveRuns,
   useRuns,
   useActivity,
+  useRunAllScenarios,
+  useRunScenario,
 } from '@/hooks/use-data';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +19,8 @@ import { Badge } from '@/components/ui/badge';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Spinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
-import { cn, formatDuration, formatRelativeTime, getStatusColor } from '@/lib/utils';
+import { selectProjectFolder } from '@/lib/project-import';
+import { cn, formatDuration, formatRelativeTime } from '@/lib/utils';
 import type { Scenario, Run, ActivityItem } from '@/types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -168,22 +175,141 @@ function TestDistribution({ scenarios }: { scenarios: Scenario[] }) {
   );
 }
 
+// ── Runs Card (tabbed) ──────────────────────────────────────────────────────
+
+type RunsTab = 'current' | 'completed';
+
+function RunsCard({
+  activeRuns,
+  recentRuns,
+  runsLoading,
+  onRunClick,
+}: {
+  activeRuns: Run[];
+  recentRuns: Run[];
+  runsLoading: boolean;
+  onRunClick: (id: string) => void;
+}) {
+  const [tab, setTab] = useState<RunsTab>('current');
+  const completedRuns = recentRuns.filter((r) => r.state !== 'running');
+  const displayRuns = tab === 'current' ? activeRuns : completedRuns;
+
+  return (
+    <Card
+      header={
+        <div className="flex items-center gap-1">
+          {(['current', 'completed'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={cn(
+                'px-2.5 py-1 text-xs font-medium rounded-md transition-colors',
+                tab === t
+                  ? 'bg-bg-tertiary text-text-primary'
+                  : 'text-text-tertiary hover:text-text-secondary',
+              )}
+            >
+              {t === 'current' ? 'Current' : 'Completed'}
+              {t === 'current' && activeRuns.length > 0 && (
+                <span className="ml-1.5 text-[10px] text-accent-primary">{activeRuns.length}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      }
+      padding={false}
+    >
+      {runsLoading ? (
+        <div className="flex justify-center py-8">
+          <Spinner />
+        </div>
+      ) : displayRuns.length === 0 ? (
+        <EmptyState
+          title={tab === 'current' ? 'No active runs' : 'No completed runs'}
+          description={tab === 'current' ? 'Start a test to see it here.' : 'Run a test to see results here.'}
+        />
+      ) : (
+        <div className="divide-y divide-border-default">
+          {displayRuns.map((run: Run) => (
+            <button
+              key={run.id}
+              onClick={() => onRunClick(run.id)}
+              className="flex items-center gap-3 w-full px-3 py-2.5 text-left hover:bg-bg-hover transition-colors cursor-default"
+            >
+              <StatusDot status={run.state} pulse={run.state === 'running'} />
+              <span className="text-sm text-text-primary truncate flex-1">
+                {run.scenarioName}
+              </span>
+              <Badge
+                variant={
+                  run.state === 'passed'
+                    ? 'success'
+                    : run.state === 'failed'
+                      ? 'error'
+                      : run.state === 'running'
+                        ? 'info'
+                        : 'default'
+                }
+              >
+                {run.state}
+              </Badge>
+              {run.duration != null && (
+                <span className="text-xs text-text-tertiary w-14 text-right">
+                  {formatDuration(run.duration)}
+                </span>
+              )}
+              <span className="text-xs text-text-tertiary w-16 text-right">
+                {formatRelativeTime(run.startedAt)}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function OverviewPage() {
-  const { activeWorkspaceId, setActiveSection } = useAppStore();
+  const { activeWorkspaceId, setActiveSection, coverageMappedWorkspaceIds } = useAppStore();
+  const navigate = useNavigate();
+  const importWorkspace = useImportWorkspace();
+  const mapSuitesMutation = useMapSuites();
+  const runAllMutation = useRunAllScenarios();
+  const runScenarioMutation = useRunScenario();
 
   useEffect(() => {
     setActiveSection('overview');
   }, [setActiveSection]);
 
-  const { data: workspace, isLoading: wsLoading } = useWorkspace(activeWorkspaceId);
-  const { data: scenarios, isLoading: scenariosLoading } = useScenarios();
-  const { data: activeRuns } = useActiveRuns();
-  const { data: recentRuns, isLoading: runsLoading } = useRuns({ limit: 5 });
-  const { data: activity, isLoading: activityLoading } = useActivity(10);
+  const workspace = useActiveWorkspace();
+  const workspaceReady = !!activeWorkspaceId;
+  const { data: projects } = useProjects(activeWorkspaceId);
+  const primaryProject = projects?.[0] ?? null;
+  const { data: scenarios, isLoading: scenariosLoading } = useScenarios(undefined, workspaceReady);
+  const { data: activeRuns } = useActiveRuns(workspaceReady);
+  const { data: recentRuns, isLoading: runsLoading } = useRuns({ limit: 5 }, workspaceReady);
+  const { data: activity, isLoading: activityLoading } = useActivity(10, workspaceReady);
 
-  const isLoading = wsLoading || scenariosLoading;
+  const isLoading = (workspaceReady && !workspace) || (workspaceReady && scenariosLoading);
+  const passingCount = scenarios?.filter((scenario) => scenario.status === 'passing').length ?? workspace?.passingCount ?? 0;
+  const failingCount = scenarios?.filter((scenario) => scenario.status === 'failing').length ?? workspace?.failingCount ?? 0;
+  const flakyCount = scenarios?.filter((s) => s.status === 'flaky').length ?? 0;
+  const passRate = workspace && workspace.testCount > 0
+    ? Math.round((passingCount / workspace.testCount) * 100)
+    : 0;
+  const coveragePercent = workspace
+    ? (Number.isFinite(workspace.coveragePercent) ? workspace.coveragePercent : passRate)
+    : 0;
+
+  useEffect(() => {
+    if (!workspace) return;
+    if (coveragePercent >= 70) return;
+    if (coverageMappedWorkspaceIds.includes(workspace.id)) return;
+    if (mapSuitesMutation.isPending) return;
+    mapSuitesMutation.mutate(workspace.id);
+  }, [coverageMappedWorkspaceIds, coveragePercent, mapSuitesMutation, workspace]);
 
   if (isLoading) {
     return (
@@ -198,17 +324,32 @@ export default function OverviewPage() {
       <EmptyState
         title="No workspace selected"
         description="Select or import a workspace to get started."
+        action={
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={async () => {
+              const path = await selectProjectFolder();
+              if (!path) return;
+              importWorkspace.mutate(path);
+            }}
+          >
+            Import Project
+          </Button>
+        }
       />
     );
   }
 
-  const passRate = workspace.testCount > 0
-    ? Math.round((workspace.passingCount / workspace.testCount) * 100)
-    : 0;
-
-  const flakyCount = scenarios?.filter((s) => s.status === 'flaky').length ?? 0;
   const activeRunCount = activeRuns?.length ?? 0;
-  const nextAction = deriveNextAction(workspace.failingCount, workspace.coveragePercent, flakyCount);
+  const nextAction = deriveNextAction(failingCount, coveragePercent, flakyCount);
+  const failingScenarios = scenarios?.filter((scenario) => scenario.status === 'failing') ?? [];
+
+  async function handleRunFailingTests() {
+    for (const scenario of failingScenarios) {
+      await runScenarioMutation.mutateAsync(scenario.id);
+    }
+  }
 
   const nbaVariantStyles: Record<string, string> = {
     success: 'border-success/30 bg-success/5',
@@ -225,7 +366,16 @@ export default function OverviewPage() {
           <h1 className="text-lg font-semibold text-text-primary">Overview</h1>
           <p className="text-xs text-text-tertiary mt-0.5">{workspace.name}</p>
         </div>
-        <Button variant="primary" size="md">
+        <Button
+          variant="primary"
+          size="md"
+          loading={runAllMutation.isPending}
+          disabled={!primaryProject}
+          onClick={() => {
+            if (!primaryProject) return;
+            runAllMutation.mutate(primaryProject.id);
+          }}
+        >
           Run All Tests
         </Button>
       </div>
@@ -237,6 +387,7 @@ export default function OverviewPage() {
           label="Pass Rate"
           value={`${passRate}%`}
           colorClass={passRateColor(passRate)}
+          subtext={`${passingCount} passing`}
         />
         <StatCard
           label="Active Runs"
@@ -251,8 +402,9 @@ export default function OverviewPage() {
         />
         <StatCard
           label="Coverage"
-          value={`${workspace.coveragePercent}%`}
-          colorClass={workspace.coveragePercent >= 70 ? 'text-success' : 'text-warning'}
+          value={`${coveragePercent}%`}
+          colorClass={coveragePercent >= 70 ? 'text-success' : 'text-warning'}
+          subtext={`${failingCount} failing`}
         />
       </div>
 
@@ -271,54 +423,13 @@ export default function OverviewPage() {
             <p className="text-xs text-text-secondary mt-1">{nextAction.description}</p>
           </div>
 
-          {/* Recent Runs */}
-          <Card
-            header={<span className="text-xs font-medium text-text-secondary">Recent Runs</span>}
-            padding={false}
-          >
-            {runsLoading ? (
-              <div className="flex justify-center py-8">
-                <Spinner />
-              </div>
-            ) : !recentRuns || recentRuns.length === 0 ? (
-              <EmptyState title="No runs yet" description="Run a test to see results here." />
-            ) : (
-              <div className="divide-y divide-border-default">
-                {recentRuns.map((run: Run) => (
-                  <button
-                    key={run.id}
-                    className="flex items-center gap-3 w-full px-3 py-2.5 text-left hover:bg-bg-hover transition-colors cursor-default"
-                  >
-                    <StatusDot status={run.state} pulse={run.state === 'running'} />
-                    <span className="text-sm text-text-primary truncate flex-1">
-                      {run.scenarioName}
-                    </span>
-                    <Badge
-                      variant={
-                        run.state === 'passed'
-                          ? 'success'
-                          : run.state === 'failed'
-                            ? 'error'
-                            : run.state === 'running'
-                              ? 'info'
-                              : 'default'
-                      }
-                    >
-                      {run.state}
-                    </Badge>
-                    {run.duration != null && (
-                      <span className="text-xs text-text-tertiary w-14 text-right">
-                        {formatDuration(run.duration)}
-                      </span>
-                    )}
-                    <span className="text-xs text-text-tertiary w-16 text-right">
-                      {formatRelativeTime(run.startedAt)}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </Card>
+          {/* Runs — tabbed */}
+          <RunsCard
+            activeRuns={activeRuns ?? []}
+            recentRuns={recentRuns ?? []}
+            runsLoading={runsLoading}
+            onRunClick={(id) => navigate(`/runs/${id}`)}
+          />
 
           {/* Test Distribution */}
           <Card
@@ -385,15 +496,31 @@ export default function OverviewPage() {
             }
           >
             <div className="flex flex-col gap-2">
-              <Button variant="outline" size="sm" className="w-full justify-start">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start"
+                loading={runScenarioMutation.isPending}
+                onClick={() => void handleRunFailingTests()}
+              >
                 <span className={cn('text-error')}>&#9654;</span>
                 Run Failing Tests
               </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start"
+                onClick={() => navigate('/editor')}
+              >
                 <span className="text-text-tertiary">&#9998;</span>
                 Open Editor
               </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start"
+                onClick={() => navigate('/telemetry')}
+              >
                 <span className="text-accent-primary">&#9632;</span>
                 View Telemetry
               </Button>

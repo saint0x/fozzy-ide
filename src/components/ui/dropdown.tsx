@@ -62,6 +62,7 @@ export function DropdownItem({
 }: DropdownItemProps) {
   return (
     <button
+      type="button"
       disabled={disabled}
       onClick={onClick}
       className={cn(

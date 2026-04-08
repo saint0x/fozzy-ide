@@ -1,11 +1,19 @@
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/stores/app-store';
-import { useProjects } from '@/hooks/use-data';
+import {
+  useImportProject,
+  useInitializeProject,
+  useProjects,
+  useRunAllScenarios,
+  useScanProject,
+} from '@/hooks/use-data';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
+import { selectProjectFolder } from '@/lib/project-import';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import type { Project } from '@/types';
 
@@ -79,6 +87,11 @@ function ConfigIndicator({ status }: { status: Project['configStatus'] }) {
 // ── Project Card ─────────────────────────────────────────────────────────────
 
 function ProjectCard({ project }: { project: Project }) {
+  const navigate = useNavigate();
+  const scanProject = useScanProject();
+  const initializeProject = useInitializeProject();
+  const runAllScenarios = useRunAllScenarios();
+
   return (
     <Card hoverable className="flex flex-col">
       <div className="space-y-3">
@@ -114,18 +127,34 @@ function ProjectCard({ project }: { project: Project }) {
         {/* Actions */}
         <div className="flex items-center gap-2 pt-1 border-t border-border-muted">
           {project.configStatus === 'unconfigured' && (
-            <Button variant="primary" size="sm">
+            <Button
+              variant="primary"
+              size="sm"
+              loading={initializeProject.isPending}
+              onClick={() => initializeProject.mutate(project.id)}
+            >
               Initialize
             </Button>
           )}
-          <Button variant="outline" size="sm">
+          <Button
+            variant="outline"
+            size="sm"
+            loading={scanProject.isPending}
+            onClick={() => scanProject.mutate(project.id)}
+          >
             Scan
           </Button>
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/editor')}>
             Open
           </Button>
           {project.configStatus === 'configured' && project.scanState === 'complete' && (
-            <Button variant="ghost" size="sm" className="ml-auto">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto"
+              loading={runAllScenarios.isPending}
+              onClick={() => runAllScenarios.mutate(project.id)}
+            >
               Run All
             </Button>
           )}
@@ -139,6 +168,8 @@ function ProjectCard({ project }: { project: Project }) {
 
 export default function ProjectsPage() {
   const { activeWorkspaceId, setActiveSection } = useAppStore();
+  const importProject = useImportProject();
+  const scanProject = useScanProject();
 
   useEffect(() => {
     setActiveSection('projects');
@@ -154,16 +185,27 @@ export default function ProjectsPage() {
     );
   }
 
+  async function handleImportProject() {
+    const path = await selectProjectFolder();
+    if (!path) return;
+    importProject.mutate(path);
+  }
+
+  function handleScanAll() {
+    if (!projects) return;
+    projects.forEach((project) => scanProject.mutate(project.id));
+  }
+
   return (
     <div className="p-6 space-y-6 max-w-[1200px]">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-text-primary">Projects</h1>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="md">
+          <Button variant="outline" size="md" loading={scanProject.isPending} onClick={handleScanAll}>
             Scan All
           </Button>
-          <Button variant="primary" size="md">
+          <Button variant="primary" size="md" disabled={!activeWorkspaceId} onClick={handleImportProject}>
             Import Project
           </Button>
         </div>
@@ -175,7 +217,7 @@ export default function ProjectsPage() {
           title="No projects found"
           description="Import a project to get started."
           action={
-            <Button variant="primary" size="sm">
+            <Button variant="primary" size="sm" disabled={!activeWorkspaceId} onClick={handleImportProject}>
               Import Project
             </Button>
           }

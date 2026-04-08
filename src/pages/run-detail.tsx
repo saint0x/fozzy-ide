@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useRun, useArtifacts, useTraces, useCancelRun } from '@/hooks/use-data';
+import { appDataProvider } from '@/data/provider';
 import { useAppStore } from '@/stores/app-store';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,7 @@ import { StatusDot } from '@/components/ui/status-dot';
 import { Spinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Tabs, TabList, Tab, TabPanel } from '@/components/ui/tabs';
-import { cn, formatDuration, formatRelativeTime, formatBytes, getStatusBgColor } from '@/lib/utils';
+import { cn, formatDuration, formatRelativeTime, formatBytes } from '@/lib/utils';
 import type { RunState } from '@/types';
 
 function stateToVariant(state: RunState) {
@@ -216,7 +217,11 @@ export default function RunDetailPage() {
                   <span className="text-xs text-text-tertiary tabular-nums w-20 text-right">
                     {formatBytes(art.size)}
                   </span>
-                  <Button variant="outline" size="sm">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void appDataProvider.artifacts.download(art.id)}
+                  >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                       <polyline points="7 10 12 15 17 10" />

@@ -65,6 +65,27 @@ const workspaceRepo: WorkspaceRepository = {
     mockWorkspaces.push(ws);
     return delay(ws, 100);
   },
+  mapSuites: (id: string) => {
+    const ws = mockWorkspaces.find((w) => w.id === id);
+    if (!ws) return Promise.reject(notFound('Workspace', id));
+    const run: Run = {
+      id: `run-${Date.now()}`,
+      scenarioId: `map:${id}`,
+      scenarioName: 'map suites',
+      projectName: ws.name,
+      state: 'passed',
+      startedAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+      duration: 120,
+      stdout: '{"schemaVersion":"fozzy.map_suites.v2","ok":true}',
+      stderr: '',
+      exitCode: 0,
+      artifacts: [],
+      traceId: null,
+    };
+    mockRuns.unshift(run);
+    return delay(run, 100);
+  },
 };
 
 const projectRepo: ProjectRepository = {
@@ -72,6 +93,22 @@ const projectRepo: ProjectRepository = {
   get: (id: string) => {
     const proj = mockProjects.find((p) => p.id === id);
     return proj ? delay(proj) : Promise.reject(notFound('Project', id));
+  },
+  import: (workspaceId: string, path: string) => {
+    const name = path.split('/').pop() || 'project';
+    const project = {
+      id: `proj-${Date.now()}`,
+      workspaceId,
+      name,
+      path,
+      language: 'typescript' as const,
+      scanState: 'complete' as const,
+      configStatus: 'unconfigured' as const,
+      scenarioCount: 0,
+      lastScanned: new Date().toISOString(),
+    };
+    mockProjects.unshift(project);
+    return delay(project, 100);
   },
   scan: (id: string) => {
     const proj = mockProjects.find((p) => p.id === id);
@@ -152,6 +189,7 @@ const runRepo: RunRepository = {
     const run = mockRuns.find((r) => r.id === id);
     return run ? delay(run) : Promise.reject(notFound('Run', id));
   },
+  events: () => delay([]),
   cancel: (id: string) => {
     const run = mockRuns.find((r) => r.id === id);
     if (!run) return Promise.reject(notFound('Run', id));
@@ -209,6 +247,22 @@ const artifactRepo: ArtifactRepository = {
 const fileSystemRepo: FileSystemRepository = {
   getTree: (_rootPath: string) => delay(structuredClone(mockFileTree)),
   readFile: (_path: string) => delay(mockFileContent, 80),
+  getDocumentBundle: (path: string) =>
+    delay({
+      workspaceId: 'mock-workspace',
+      path,
+      diagnostics: {
+        workspaceId: 'mock-workspace',
+        path,
+        diagnostics: [],
+        raw: null,
+      },
+      completions: [],
+      hover: null,
+      symbols: [],
+      codeActions: [],
+      semanticTokens: [],
+    }, 80),
   writeFile: (_path: string, _content: string) => delay(undefined, 50),
   getDiagnostics: () => delay([...mockDiagnostics]),
 };

@@ -6,6 +6,7 @@ import {
   Play,
   GitBranch,
   Activity,
+  TrendingUp,
   Code,
   Archive,
   Settings,
@@ -28,6 +29,7 @@ const mainNav = [
   { to: '/runs', label: 'Runs', icon: Play, section: 'runs' as const },
   { to: '/traces', label: 'Traces', icon: GitBranch, section: 'traces' as const },
   { to: '/telemetry', label: 'Telemetry', icon: Activity, section: 'telemetry' as const },
+  { to: '/trends', label: 'Trends', icon: TrendingUp, section: 'trends' as const },
 ];
 
 const utilityNav = [

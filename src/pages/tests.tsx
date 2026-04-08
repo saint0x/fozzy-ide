@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useAppStore } from '@/stores/app-store';
-import { useScenarios, useRunScenario } from '@/hooks/use-data';
+import { useProjects, useRunAllScenarios, useScenarios, useRunScenario } from '@/hooks/use-data';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { StatusDot } from '@/components/ui/status-dot';
@@ -23,14 +23,6 @@ const typeColors: Record<ScenarioType, string> = {
   memory: 'bg-orange-500/10 text-orange-400',
   host: 'bg-cyan-500/10 text-cyan-400',
   generated: 'bg-pink-500/10 text-pink-400',
-};
-
-const statusBadgeVariant: Record<ScenarioStatus, 'success' | 'error' | 'warning' | 'default' | 'outline'> = {
-  passing: 'success',
-  failing: 'error',
-  flaky: 'warning',
-  skipped: 'default',
-  unknown: 'outline',
 };
 
 type SortKey = 'name' | 'status' | 'type' | 'lastRun' | 'duration';
@@ -67,7 +59,7 @@ function FilterToggle<T extends string>({
             key={opt}
             onClick={() => toggle(opt)}
             className={cn(
-              'inline-flex items-center rounded-md px-2 py-1 text-[11px] font-medium transition-colors cursor-default',
+              'inline-flex items-center rounded-md px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer',
               isActive
                 ? colorFn?.(opt) ?? 'bg-accent-primary/15 text-accent-primary'
                 : 'bg-bg-tertiary text-text-tertiary hover:text-text-secondary hover:bg-bg-hover',
@@ -97,7 +89,7 @@ function SortSelect({
       className={cn(
         'h-8 rounded-md border border-border-default bg-bg-secondary px-2 text-xs text-text-secondary',
         'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-primary',
-        'cursor-default',
+        'cursor-pointer',
       )}
     >
       <option value="name">Name</option>
@@ -153,7 +145,7 @@ function ScenarioRow({
   isRunning: boolean;
 }) {
   return (
-    <tr className="group hover:bg-bg-hover transition-colors cursor-default border-b border-border-muted last:border-b-0">
+    <tr className="group hover:bg-bg-hover transition-colors border-b border-border-muted last:border-b-0">
       {/* Status */}
       <td className="py-2.5 px-3 w-8">
         <StatusDot status={scenario.status} />
@@ -226,6 +218,7 @@ function ScenarioRow({
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function TestsPage() {
+  const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId);
   const setActiveSection = useAppStore((s) => s.setActiveSection);
 
   useEffect(() => {
@@ -233,7 +226,10 @@ export default function TestsPage() {
   }, [setActiveSection]);
 
   const { data: scenarios, isLoading } = useScenarios();
+  const { data: projects } = useProjects(activeWorkspaceId);
+  const primaryProject = projects?.[0] ?? null;
   const runMutation = useRunScenario();
+  const runAllMutation = useRunAllScenarios();
 
   // Filters
   const [selectedTypes, setSelectedTypes] = useState<Set<ScenarioType>>(new Set());
@@ -324,7 +320,16 @@ export default function TestsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-text-primary">Tests</h1>
-        <Button variant="primary" size="md">
+        <Button
+          variant="primary"
+          size="md"
+          loading={runAllMutation.isPending}
+          disabled={!primaryProject}
+          onClick={() => {
+            if (!primaryProject) return;
+            runAllMutation.mutate(primaryProject.id);
+          }}
+        >
           Run All
         </Button>
       </div>

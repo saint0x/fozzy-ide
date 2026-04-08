@@ -3,6 +3,7 @@ use crate::models::{
     CliResultEnvelope, CommonFozzyOptions, FozzyCommand, FozzyCommandRequest, MapCommand,
     ScenarioArgCommand, ScenarioListCommand,
 };
+use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Instant;
@@ -11,41 +12,110 @@ use tokio::process::Command;
 #[derive(Clone, Default)]
 pub struct FozzyCliService;
 
+pub struct PreparedCliCommand {
+    pub command: String,
+    pub args: Vec<String>,
+    pub cwd: PathBuf,
+}
+
 impl FozzyCliService {
+    pub fn prepare(
+        &self,
+        workspace_root: &Path,
+        request: &FozzyCommandRequest,
+    ) -> PreparedCliCommand {
+        let (command, mut args, cwd) = build_args(workspace_root, &request.command);
+        args.insert(0, command.clone());
+        PreparedCliCommand { command, args, cwd }
+    }
+
     pub async fn execute(
         &self,
         workspace_root: &Path,
         request: &FozzyCommandRequest,
     ) -> AppResult<CliResultEnvelope> {
-        let (command, mut args, cwd) = build_args(workspace_root, &request.command);
-        args.insert(0, command.clone());
+        let prepared = self.prepare(workspace_root, request);
         let started = Instant::now();
         let output = Command::new("fozzy")
-            .args(&args)
-            .current_dir(&cwd)
+            .args(&prepared.args)
+            .current_dir(&prepared.cwd)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
             .await?;
-        let stdout_text = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr_text = String::from_utf8_lossy(&output.stderr).to_string();
-        let stdout_json = serde_json::from_slice(&output.stdout).ok();
-        Ok(CliResultEnvelope {
-            command,
-            args,
-            cwd: cwd.to_string_lossy().to_string(),
-            status: if output.status.success() {
-                "succeeded".into()
-            } else {
-                "failed".into()
-            },
-            exit_code: output.status.code(),
+        Ok(self.finalize(prepared, &output.stdout, &output.stderr, output.status.code(), output.status.success(), started.elapsed().as_millis()))
+    }
+
+    pub fn finalize(
+        &self,
+        prepared: PreparedCliCommand,
+        stdout: &[u8],
+        stderr: &[u8],
+        exit_code: Option<i32>,
+        command_succeeded: bool,
+        duration_ms: u128,
+    ) -> CliResultEnvelope {
+        let stdout_text = String::from_utf8_lossy(stdout).to_string();
+        let stderr_text = String::from_utf8_lossy(stderr).to_string();
+        let stdout_json = serde_json::from_slice(stdout).ok();
+        CliResultEnvelope {
+            command: prepared.command,
+            args: prepared.args,
+            cwd: prepared.cwd.to_string_lossy().to_string(),
+            status: canonical_run_status(stdout_json.as_ref(), exit_code, command_succeeded),
+            exit_code,
             stdout_json,
             stdout_text,
             stderr_text,
-            duration_ms: started.elapsed().as_millis(),
-        })
+            duration_ms,
+        }
+    }
+}
+
+pub(crate) fn canonical_run_status(
+    stdout_json: Option<&Value>,
+    exit_code: Option<i32>,
+    command_succeeded: bool,
+) -> String {
+    if let Some(status) = stdout_json
+        .and_then(extract_status)
+        .and_then(normalize_status)
+    {
+        return status.to_string();
+    }
+
+    match exit_code {
+        Some(0) => "pass".into(),
+        Some(1) => "fail".into(),
+        Some(2) => "error".into(),
+        Some(3) => "timeout".into(),
+        Some(4) => "crash".into(),
+        Some(_) => "error".into(),
+        None if command_succeeded => "pass".into(),
+        None => "crash".into(),
+    }
+}
+
+fn extract_status(value: &Value) -> Option<&str> {
+    value
+        .get("status")
+        .and_then(Value::as_str)
+        .or_else(|| value.get("summary").and_then(extract_status))
+        .or_else(|| value.get("result").and_then(extract_status))
+}
+
+fn normalize_status(status: &str) -> Option<&'static str> {
+    let normalized = status.trim().to_ascii_lowercase();
+    match normalized.as_str() {
+        "pass" | "passed" | "succeeded" | "success" => Some("pass"),
+        "fail" | "failed" => Some("fail"),
+        "error" => Some("error"),
+        "timeout" | "timedout" | "timed_out" => Some("timeout"),
+        "crash" | "crashed" => Some("crash"),
+        "cancelled" | "canceled" => Some("cancelled"),
+        "running" => Some("running"),
+        _ => None,
     }
 }
 

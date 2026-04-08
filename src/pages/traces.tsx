@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Spinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
-import { cn, formatBytes, formatRelativeTime } from '@/lib/utils';
+import { formatBytes, formatRelativeTime } from '@/lib/utils';
 
 function phaseVariant(phase: string) {
   switch (phase) {

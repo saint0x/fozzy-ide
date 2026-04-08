@@ -2,29 +2,13 @@ import { useRef, useCallback, useEffect, useState } from 'react';
 import { X, Minus, GripHorizontal, AlertCircle, AlertTriangle, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/stores/app-store';
+import { useActiveRuns, useDiagnostics, useRunEvents, useRuns, useRunTerminalCommand, useTerminalSessions } from '@/hooks/use-data';
 import type { DrawerTab } from '@/stores/app-store';
 
 const tabs: { value: DrawerTab; label: string }[] = [
   { value: 'terminal', label: 'Terminal' },
   { value: 'output', label: 'Output' },
   { value: 'problems', label: 'Problems' },
-];
-
-const mockProblems = [
-  { severity: 'error' as const, message: 'Cannot find module \'@/missing\'', file: 'src/app.ts', line: 12, col: 5 },
-  { severity: 'warning' as const, message: 'Unused variable \'count\'', file: 'src/lib/utils.ts', line: 34, col: 7 },
-  { severity: 'info' as const, message: 'Consider using optional chaining', file: 'src/hooks/use-data.ts', line: 8, col: 15 },
-];
-
-const mockOutput = [
-  '[10:32:01] Starting build...',
-  '[10:32:01] Compiling TypeScript...',
-  '[10:32:03] 0 errors, 1 warning',
-  '[10:32:03] Build completed in 2.1s',
-  '[10:32:05] Running test suite...',
-  '[10:32:06] PASS src/lib/utils.test.ts',
-  '[10:32:07] PASS src/hooks/use-data.test.ts',
-  '[10:32:07] Tests: 14 passed, 0 failed',
 ];
 
 export function BottomDrawer() {
@@ -34,6 +18,9 @@ export function BottomDrawer() {
   const toggleDrawer = useAppStore((s) => s.toggleDrawer);
   const setDrawerHeight = useAppStore((s) => s.setDrawerHeight);
   const setDrawerTab = useAppStore((s) => s.setDrawerTab);
+  const loadProblems = drawerOpen && drawerTab === 'problems';
+  const { data: diagnostics } = useDiagnostics(loadProblems);
+  const problems = diagnostics ?? [];
 
   const dragging = useRef(false);
   const startY = useRef(0);
@@ -88,7 +75,7 @@ export function BottomDrawer() {
           >
             {tab.label}
             {tab.value === 'problems' && (
-              <span className="ml-1 text-[10px] text-error">{mockProblems.length}</span>
+              <span className="ml-1 text-[10px] text-error">{problems.length}</span>
             )}
           </button>
         ))}
@@ -125,7 +112,7 @@ export function BottomDrawer() {
             >
               {tab.label}
               {tab.value === 'problems' && (
-                <span className="ml-1 text-[10px] text-error">{mockProblems.length}</span>
+                <span className="ml-1 text-[10px] text-error">{problems.length}</span>
               )}
               {drawerTab === tab.value && (
                 <span className="absolute bottom-0 left-0 right-0 h-px bg-accent-primary" />
@@ -154,48 +141,107 @@ export function BottomDrawer() {
       <div className="flex-1 overflow-auto">
         {drawerTab === 'terminal' && <TerminalPanel />}
         {drawerTab === 'output' && <OutputPanel />}
-        {drawerTab === 'problems' && <ProblemsPanel />}
+        {drawerTab === 'problems' && <ProblemsPanel problems={problems} />}
       </div>
     </div>
   );
 }
 
 function TerminalPanel() {
+  const terminalSessions = useTerminalSessions(true);
+  const runTerminalCommand = useRunTerminalCommand();
   const [cursorVisible, setCursorVisible] = useState(true);
+  const bootstrapCommand = 'pwd && git status --short && ls -la';
 
   useEffect(() => {
     const interval = setInterval(() => setCursorVisible((v) => !v), 530);
     return () => clearInterval(interval);
   }, []);
 
+  const sessions = terminalSessions.data ?? [];
+  const latest = sessions[0];
+
+  useEffect(() => {
+    if (terminalSessions.isLoading) return;
+    if (latest) return;
+    if (runTerminalCommand.isPending) return;
+    runTerminalCommand.mutate(bootstrapCommand);
+  }, [bootstrapCommand, latest, runTerminalCommand, terminalSessions.isLoading]);
+
   return (
     <div className="p-3 font-mono text-xs text-text-secondary leading-relaxed">
-      <div className="text-text-muted">Last login: Mon Apr 6 09:15:23 on ttys001</div>
-      <div>
-        <span className="text-accent-primary">~/workspace</span>
-        <span className="text-text-muted"> $ </span>
-        <span className="text-text-primary">fozzy run --all</span>
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-text-muted">Local terminal context</div>
+        <button
+          onClick={() => runTerminalCommand.mutate(bootstrapCommand)}
+          className="text-text-muted hover:text-text-secondary transition-colors"
+        >
+          Refresh
+        </button>
       </div>
-      <div className="text-success">Running 14 scenarios...</div>
-      <div className="text-text-muted">
-        <span className="text-accent-primary">~/workspace</span>
-        <span className="text-text-muted"> $ </span>
-        <span
-          className={cn(
-            'inline-block w-1.5 h-3.5 bg-text-primary align-text-bottom',
-            !cursorVisible && 'opacity-0',
-          )}
-        />
-      </div>
+      {latest ? (
+        <>
+          <div>
+            <span className="text-accent-primary">{latest.cwd}</span>
+            <span className="text-text-muted"> $ </span>
+            <span className="text-text-primary">{latest.shell}</span>
+          </div>
+          <pre className="mt-2 whitespace-pre-wrap text-text-secondary">
+            {latest.lastOutput || '[no output]'}
+          </pre>
+        </>
+      ) : (
+        <div className="text-text-muted">
+          <span className="text-accent-primary">~/.fozzy-ide</span>
+          <span className="text-text-muted"> $ </span>
+          <span
+            className={cn(
+              'inline-block w-1.5 h-3.5 bg-text-primary align-text-bottom',
+              !cursorVisible && 'opacity-0',
+            )}
+          />
+        </div>
+      )}
     </div>
   );
 }
 
 function OutputPanel() {
+  const activeRunsQuery = useActiveRuns(true);
+  const runsQuery = useRuns({ limit: 8 }, true);
+  const runEventsQuery = useRunEvents(true);
+  const activeRuns = activeRunsQuery.data ?? [];
+  const recentRuns = runsQuery.data ?? [];
+  const activeOutputLines = activeRuns.flatMap((run) => {
+    const header = `[${new Date(run.startedAt).toLocaleTimeString()}] RUNNING ${run.scenarioName} (${run.projectName})`;
+    const stdoutLines = run.stdout.split('\n').filter(Boolean).slice(-6);
+    const stderrLines = run.stderr.split('\n').filter(Boolean).slice(-4);
+    return [header, ...stdoutLines, ...stderrLines];
+  });
+  const lines = recentRuns.flatMap((run) => {
+    const summary = [`[${new Date(run.startedAt).toLocaleTimeString()}] ${run.state.toUpperCase()} ${run.scenarioName}`];
+    const stdoutLines = run.stdout.split('\n').filter(Boolean).slice(0, 3);
+    const stderrLines = run.stderr.split('\n').filter(Boolean).slice(0, 2);
+    return [...summary, ...stdoutLines, ...stderrLines];
+  });
+  const eventLines = (runEventsQuery.data ?? [])
+    .slice(-12)
+    .map((event) => {
+      const details =
+        event.kind === 'runFinished'
+          ? `${String(event.payload.status ?? 'finished').toUpperCase()} exit=${String(event.payload.exitCode ?? '--')}`
+          : event.kind;
+      return `[${new Date(event.at).toLocaleTimeString()}] ${details}`;
+    });
+  const mergedLines = [...activeOutputLines, ...eventLines, ...lines]
+    .filter(Boolean)
+    .slice(0, 48);
+
   return (
     <div className="p-3 font-mono text-xs text-text-secondary leading-relaxed space-y-0.5">
-      {mockOutput.map((line, i) => (
-        <div key={i} className={cn(line.includes('PASS') && 'text-success', line.includes('FAIL') && 'text-error')}>
+      {mergedLines.length === 0 && <div className="text-text-muted">No run output yet.</div>}
+      {mergedLines.map((line, i) => (
+        <div key={i} className={cn(line.includes('PASSED') && 'text-success', line.includes('FAILED') && 'text-error')}>
           {line}
         </div>
       ))}
@@ -203,22 +249,30 @@ function OutputPanel() {
   );
 }
 
-function ProblemsPanel() {
+function ProblemsPanel({
+  problems,
+}: {
+  problems: Array<{ severity: 'error' | 'warning' | 'info' | 'hint'; message: string; filePath: string; line: number; column: number }>;
+}) {
   const severityIcon = {
     error: <AlertCircle className="h-3.5 w-3.5 text-error shrink-0" />,
     warning: <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0" />,
     info: <Info className="h-3.5 w-3.5 text-info shrink-0" />,
+    hint: <Info className="h-3.5 w-3.5 text-info shrink-0" />,
   };
 
   return (
     <div className="divide-y divide-border-muted">
-      {mockProblems.map((problem, i) => (
+      {problems.length === 0 && (
+        <div className="px-3 py-2 text-xs text-text-muted">No diagnostics.</div>
+      )}
+      {problems.map((problem, i) => (
         <div key={i} className="flex items-start gap-2 px-3 py-2 hover:bg-bg-hover transition-colors cursor-default">
           {severityIcon[problem.severity]}
           <div className="flex-1 min-w-0">
             <div className="text-xs text-text-primary">{problem.message}</div>
             <div className="text-[10px] text-text-muted mt-0.5">
-              {problem.file}:{problem.line}:{problem.col}
+              {problem.filePath}:{problem.line}:{problem.column}
             </div>
           </div>
         </div>

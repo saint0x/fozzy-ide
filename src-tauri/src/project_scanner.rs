@@ -39,10 +39,10 @@ impl ProjectScanner {
             if relative.contains("corpora") {
                 summary.corpus_paths.push(relative.clone());
             }
-            if relative.ends_with(".fozzy")
-                || relative.ends_with(".fozzy.json")
-                || relative.ends_with(".fzy")
-            {
+            if is_trace_path(&relative) {
+                summary.trace_paths.push(relative.clone());
+            }
+            if is_scenario_path(&relative) {
                 summary.scenario_paths.push(relative.clone());
                 scenarios.push(ScenarioSummary {
                     path: relative.clone(),
@@ -50,12 +50,6 @@ impl ProjectScanner {
                     title: title_from_path(&relative),
                     last_modified_at: modified_at(path),
                 });
-            }
-            if relative.contains("trace")
-                || relative.ends_with(".trace.fozzy")
-                || relative.ends_with(".fozzytrace")
-            {
-                summary.trace_paths.push(relative.clone());
             }
             if relative.contains("artifact")
                 || (relative.contains("profile") && relative.ends_with(".json"))
@@ -103,6 +97,20 @@ impl ProjectScanner {
         }
         serde_json::to_value(counts).unwrap_or_default()
     }
+}
+
+fn is_scenario_path(path: &str) -> bool {
+    if path.starts_with(".fozzy/") || path.contains("/.fozzy/") {
+        return false;
+    }
+    if is_trace_path(path) {
+        return false;
+    }
+    path.ends_with(".fozzy.json")
+}
+
+fn is_trace_path(path: &str) -> bool {
+    path.contains("trace") || path.ends_with(".trace.fozzy") || path.ends_with(".fozzytrace")
 }
 
 fn repo_metadata(root: &Path) -> AppResult<RepoMetadata> {

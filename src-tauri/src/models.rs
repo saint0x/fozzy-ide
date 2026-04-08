@@ -46,6 +46,23 @@ pub struct WorkspaceSummary {
     pub name: String,
     pub root_path: String,
     pub parent_path: String,
+    pub imported_at: DateTime<Utc>,
+    pub last_opened_at: DateTime<Utc>,
+    pub scenario_count: usize,
+    pub trace_count: usize,
+    pub artifact_count: usize,
+    pub config_path: Option<String>,
+    pub readiness_gaps: Vec<ReadinessGap>,
+    pub session: WorkspaceSessionState,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceDetail {
+    pub id: String,
+    pub name: String,
+    pub root_path: String,
+    pub parent_path: String,
     pub trusted: bool,
     pub repo: RepoMetadata,
     pub imported_at: DateTime<Utc>,
@@ -53,9 +70,66 @@ pub struct WorkspaceSummary {
     pub scenario_count: usize,
     pub trace_count: usize,
     pub artifact_count: usize,
+    pub config_path: Option<String>,
     pub readiness_gaps: Vec<ReadinessGap>,
-    pub scan_summary: ScanSummary,
     pub session: WorkspaceSessionState,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceProjectSummary {
+    pub id: String,
+    pub workspace_id: String,
+    pub name: String,
+    pub root_path: String,
+    pub parent_path: String,
+    pub imported_at: DateTime<Utc>,
+    pub last_opened_at: DateTime<Utc>,
+    pub scenario_count: usize,
+    pub trace_count: usize,
+    pub artifact_count: usize,
+    pub config_path: Option<String>,
+    pub readiness_gaps: Vec<ReadinessGap>,
+    pub repo: RepoMetadata,
+}
+
+impl WorkspaceProjectSummary {
+    pub fn from_workspace(workspace: &WorkspaceDetail) -> Self {
+        Self {
+            id: workspace.id.clone(),
+            workspace_id: workspace.id.clone(),
+            name: workspace.name.clone(),
+            root_path: workspace.root_path.clone(),
+            parent_path: workspace.parent_path.clone(),
+            imported_at: workspace.imported_at,
+            last_opened_at: workspace.last_opened_at,
+            scenario_count: workspace.scenario_count,
+            trace_count: workspace.trace_count,
+            artifact_count: workspace.artifact_count,
+            config_path: workspace.config_path.clone(),
+            readiness_gaps: workspace.readiness_gaps.clone(),
+            repo: workspace.repo.clone(),
+        }
+    }
+}
+
+impl From<&WorkspaceDetail> for WorkspaceSummary {
+    fn from(value: &WorkspaceDetail) -> Self {
+        Self {
+            id: value.id.clone(),
+            name: value.name.clone(),
+            root_path: value.root_path.clone(),
+            parent_path: value.parent_path.clone(),
+            imported_at: value.imported_at,
+            last_opened_at: value.last_opened_at,
+            scenario_count: value.scenario_count,
+            trace_count: value.trace_count,
+            artifact_count: value.artifact_count,
+            config_path: value.config_path.clone(),
+            readiness_gaps: value.readiness_gaps.clone(),
+            session: value.session.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,6 +151,16 @@ pub struct ScenarioInventory {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AppBootstrap {
+    pub storage_root: String,
+    pub db_path: String,
+    pub settings: AppSettings,
+    pub workspaces: Vec<WorkspaceSummary>,
+    pub active_workspace_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RunSummary {
     pub id: String,
     pub workspace_id: String,
@@ -89,6 +173,24 @@ pub struct RunSummary {
     pub finished_at: Option<DateTime<Utc>>,
     pub trace_path: Option<String>,
     pub stdout_json: Option<Value>,
+    pub stdout_text: String,
+    pub stderr_text: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunListItem {
+    pub id: String,
+    pub workspace_id: String,
+    pub command: String,
+    pub args: Vec<String>,
+    pub status: String,
+    pub exit_code: Option<i32>,
+    pub started_at: DateTime<Utc>,
+    pub finished_at: Option<DateTime<Utc>>,
+    pub trace_path: Option<String>,
+    pub stdout_preview: String,
+    pub stderr_preview: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,6 +220,101 @@ pub struct TelemetrySeries {
     pub workspace_id: String,
     pub metric: String,
     pub points: Vec<TelemetryPoint>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TelemetrySample {
+    pub id: String,
+    pub workspace_id: String,
+    pub run_id: Option<String>,
+    pub metric: String,
+    pub captured_at: DateTime<Utc>,
+    pub value: f64,
+    pub label: Option<String>,
+    pub tags: Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TelemetryRollup {
+    pub id: String,
+    pub workspace_id: String,
+    pub metric: String,
+    pub bucket: String,
+    pub bucket_start: DateTime<Utc>,
+    pub count: usize,
+    pub min: f64,
+    pub max: f64,
+    pub avg: f64,
+    pub sum: f64,
+    pub last: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TelemetrySnapshot {
+    pub workspace_id: String,
+    pub recorded_at: DateTime<Utc>,
+    pub pass_rate: f64,
+    pub fail_rate: f64,
+    pub total_runs: usize,
+    pub avg_latency_ms: f64,
+    pub flake_signals: usize,
+    pub memory_usage_mb: f64,
+    pub explore_progress: f64,
+    pub fuzz_progress: f64,
+    pub throughput_per_hour: f64,
+    pub trace_record_rate: f64,
+    pub artifact_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrendPoint {
+    pub ts: DateTime<Utc>,
+    pub value: f64,
+    pub count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrendSeries {
+    pub key: String,
+    pub label: String,
+    pub points: Vec<TrendPoint>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScenarioTrend {
+    pub scenario_path: String,
+    pub total_runs: usize,
+    pub success_rate: f64,
+    pub avg_latency_ms: f64,
+    pub last_status: String,
+    pub last_run_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandTrend {
+    pub command: String,
+    pub total_runs: usize,
+    pub success_rate: f64,
+    pub avg_latency_ms: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrendReport {
+    pub workspace_id: String,
+    pub range: String,
+    pub generated_at: DateTime<Utc>,
+    pub snapshot: TelemetrySnapshot,
+    pub series: Vec<TrendSeries>,
+    pub top_scenarios: Vec<ScenarioTrend>,
+    pub command_breakdown: Vec<CommandTrend>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -255,6 +452,68 @@ pub struct TerminalSession {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct FileNode {
+    pub name: String,
+    pub path: String,
+    pub node_type: String,
+    pub children: Option<Vec<FileNode>>,
+    pub language: Option<String>,
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityItem {
+    pub id: String,
+    pub item_type: String,
+    pub message: String,
+    pub timestamp: DateTime<Utc>,
+    pub link: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppSettings {
+    pub theme: String,
+    pub font_size: i64,
+    pub tab_size: i64,
+    pub auto_save: bool,
+    pub telemetry_enabled: bool,
+    pub checkpoint_interval: i64,
+    pub default_runner: String,
+    pub last_workspace_id: Option<String>,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            theme: "dark".into(),
+            font_size: 13,
+            tab_size: 2,
+            auto_save: true,
+            telemetry_enabled: true,
+            checkpoint_interval: 30,
+            default_runner: "fozzy test --det --strict".into(),
+            last_workspace_id: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsPatch {
+    pub theme: Option<String>,
+    pub font_size: Option<i64>,
+    pub tab_size: Option<i64>,
+    pub auto_save: Option<bool>,
+    pub telemetry_enabled: Option<bool>,
+    pub checkpoint_interval: Option<i64>,
+    pub default_runner: Option<String>,
+    pub last_workspace_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CliResultEnvelope {
     pub command: String,
     pub args: Vec<String>,
@@ -277,8 +536,41 @@ pub struct WorkspaceImportRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ProjectImportRequest {
+    pub workspace_id: String,
+    pub path: String,
+    #[serde(default)]
+    pub trusted: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceLookup {
     pub workspace_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectLookup {
+    pub project_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileTreeQuery {
+    pub workspace_id: String,
+    pub max_depth: Option<usize>,
+    pub max_entries: Option<usize>,
+    pub include_hidden: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FrontendLogRequest {
+    pub level: String,
+    pub scope: String,
+    pub message: String,
+    pub context: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -433,6 +725,21 @@ pub struct FozzyCommandRequest {
 pub struct TelemetryQuery {
     pub workspace_id: String,
     pub metric: String,
+    pub range: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TelemetryHistoryQuery {
+    pub workspace_id: String,
+    pub limit: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrendsQuery {
+    pub workspace_id: String,
+    pub range: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -454,4 +761,25 @@ pub struct GenerationRequest {
 pub struct TerminalSessionRequest {
     pub workspace_id: String,
     pub command: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceWorkflowRequest {
+    pub workspace_id: String,
+    pub mode: String,
+    #[serde(default)]
+    pub include_host_variants: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceWorkflowResult {
+    pub workspace_id: String,
+    pub workflow_id: String,
+    pub mode: String,
+    pub generated_paths: Vec<String>,
+    pub run_ids: Vec<String>,
+    pub trace_paths: Vec<String>,
+    pub scenario_count: usize,
 }

@@ -36,7 +36,7 @@ impl LspService {
         })
     }
 
-    async fn diagnostics(
+    pub async fn diagnostics(
         &self,
         workspace_id: &str,
         root: &Path,
